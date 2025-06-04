@@ -4,7 +4,44 @@
 
 [llms.txt](https://llmstxt.org/) is a website index for LLMs, providing background information, guidance, and links to detailed markdown files. IDEs like Cursor and Windsurf or apps like Claude Code/Desktop can use `llms.txt` to retrieve context for tasks. However, these apps use different built-in tools to read and process files like `llms.txt`. The retrieval process can be opaque, and there is not always a way to audit the tool calls or the context returned.
 
-[MCP](https://github.com/modelcontextprotocol) offers a way for developers to have *full control* over tools used by these applications. Here, we create [an open source MCP server](https://github.com/modelcontextprotocol) to provide MCP host applications (e.g., Cursor, Windsurf, Claude Code/Desktop) with (1) a user-defined list of `llms.txt` files and (2) a simple  `fetch_docs` tool read URLs within any of the provided `llms.txt` files. This allows the user to audit each tool call as well as the context returned. 
+[MCP](https://github.com/modelcontextprotocol) offers a way for developers to have *full control* over tools used by these applications. Here, we create [an open source MCP server](https://github.com/modelcontextprotocol) to provide MCP host applications (e.g., Cursor, Windsurf, Claude Code/Desktop) with enhanced documentation retrieval capabilities including dynamic source management and external documentation querying.
+
+## ✨ Enhanced Features
+
+This fork includes several powerful enhancements:
+
+### 🔧 Available MCP Tools
+
+1. **`list_doc_sources`** - List configured documentation sources
+2. **`fetch_docs`** - Fetch documentation from configured sources or URLs
+3. **`query_external_docs_smart`** - 🆕 Smart query external llms.txt with server-side string matching
+4. **`list_external_docs`** - 🆕 List all URLs from external llms.txt for agent selection  
+5. **`add_doc_source`** - 🆕 Dynamically add documentation sources at runtime
+6. **`remove_doc_source`** - 🆕 Remove documentation sources at runtime
+
+### 🚀 Two Query Approaches
+
+**Server-Side Smart Query (Fast):**
+```bash
+# One-step query with simple string matching
+query_external_docs_smart("https://openrouter.ai/docs/llms.txt", "structured")
+# ✅ Good for: "auth", "api", "structured" - direct URL matches
+# ⚠️ Limitation: Simple string matching only (not semantic search)
+```
+
+**Agent Choice (Flexible):**
+```bash
+# Step 1: List all available docs
+list_external_docs("https://openrouter.ai/docs/llms.txt")
+# Step 2: Agent analyzes and chooses best URL
+fetch_docs("https://openrouter.ai/docs/features/structured-outputs.mdx")
+# ✅ Good for: Complex queries needing semantic understanding
+```
+
+### 🌐 Dual Transport Support
+
+- **SSE Mode**: Web-based server for HTTP/browser access
+- **STDIO Mode**: Direct MCP protocol for CLI tools and IDEs 
 
 <img src="https://github.com/user-attachments/assets/736f8f55-833d-4200-b833-5fca01a09e1b" width="60%">
 
@@ -45,16 +82,59 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 > 
 > This security measure prevents unauthorized access to domains not explicitly approved by the user, ensuring that documentation can only be retrieved from trusted sources.
 
-#### (Optional) Test the MCP server locally with your `llms.txt` file(s) of choice:
+## 🚀 Quick Start
+
+### Option 1: SSE Mode (Web Server)
+
+Test the MCP server as a web service:
+
 ```bash
+# Install and run with SSE transport
 uvx --from mcpdoc mcpdoc \
-    --urls "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt" "LangChain:https://python.langchain.com/llms.txt" \
+    --urls "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt" \
     --transport sse \
     --port 8082 \
     --host localhost
 ```
 
-* This should run at: http://localhost:8082
+Server runs at: http://localhost:8082
+
+**Test the new external docs features:**
+```bash
+# Get session endpoint
+curl -H "Accept: text/event-stream" http://localhost:8082/sse
+
+# Query external docs (smart matching)
+curl -X POST http://localhost:8082/messages/?session_id=<SESSION_ID> \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "query_external_docs_smart", "arguments": {"llms_txt_url": "https://openrouter.ai/docs/llms.txt", "query": "structured"}}}'
+
+# List external docs (agent choice)
+curl -X POST http://localhost:8082/messages/?session_id=<SESSION_ID> \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "id": 2, "method": "tools/call", "params": {"name": "list_external_docs", "arguments": {"llms_txt_url": "https://openrouter.ai/docs/llms.txt"}}}'
+```
+
+### Option 2: STDIO Mode (MCP Client Integration)
+
+For direct integration with MCP clients:
+
+```bash
+# Run with stdio transport
+uvx --from mcpdoc mcpdoc \
+    --urls "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt" \
+    --transport stdio
+```
+
+**Use with MCP Inspector:**
+```bash
+# Install MCP inspector
+npm install -g @modelcontextprotocol/inspector
+
+# Test the server
+npx @modelcontextprotocol/inspector
+# Connect to: uvx --from mcpdoc mcpdoc --urls "LangGraph:https://langchain-ai.github.io/langgraph/llms.txt" --transport stdio
+```
 
 ![Screenshot 2025-03-18 at 3 29 30 PM](https://github.com/user-attachments/assets/24a3d483-cd7a-4c7e-a4f7-893df70e888f)
 
